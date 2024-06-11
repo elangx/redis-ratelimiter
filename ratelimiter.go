@@ -8,7 +8,6 @@ import (
 )
 
 var limitScript = `
-local keys = KEYS
 local strategies = ARGV
 local currentScore = tonumber(strategies[#strategies]) -- 当前时间戳
 
@@ -16,14 +15,13 @@ local currentScore = tonumber(strategies[#strategies]) -- 当前时间戳
 table.remove(strategies)
 
 local results = {}
-for i = 1, #keys do
-    local key = keys[i]
+for i = 1, #KEYS do
 	local pass = true
 	for j = 1, #strategies, 2 do
     	local windowSize = tonumber(strategies[j])
     	local maxRequests = tonumber(strategies[j + 1])
     	local windowEnd = currentScore - windowSize
-    	local count = redis.call('ZCOUNT', key, windowEnd, '+inf')
+    	local count = redis.call('ZCOUNT', KEYS[i], windowEnd, '+inf')
     	if count >= maxRequests then
 			pass = false
 			break
@@ -31,7 +29,7 @@ for i = 1, #keys do
 	end
 	if pass == true then
 		table.insert(results, 1)
-		redis.call('ZADD', key, currentScore, 'request:' .. currentScore)
+		redis.call('ZADD', KEYS[i], currentScore, 'request:' .. currentScore)
 	else 
 		table.insert(results, 0)
 	end
@@ -41,13 +39,11 @@ return results
 `
 
 var clearScript = `
-local keys = KEYS
 local expireTime = tonumber(ARGV[1])
 local curTime = tonumber(ARGV[2])
-for i = 1, #keys do
-	local key = keys[i]
-	redis.call('EXPIRE', key, expireTime)
-	redis.call('ZREMRANGEBYSCORE', key, '-inf', curTime - expireTime - 1)
+for i = 1, #KEYS do
+	redis.call('EXPIRE', KEYS[i], expireTime)
+	redis.call('ZREMRANGEBYSCORE', KEYS[i], '-inf', curTime - expireTime - 1)
 end
 `
 
